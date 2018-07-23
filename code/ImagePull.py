@@ -1,3 +1,27 @@
+# utilities
+import os, glob
+from pprint import pprint
+from shutil import copyfile, rmtree
+from photutils import SkyCircularAperture
+from photutils import aperture_photometry
+from photutils import datasets
+
+# standard packages
+import numpy as np
+import math
+from matplotlib import pyplot as plt
+from matplotlib.colors import LogNorm
+
+# astropy and astroquery
+from astroquery import sha
+from astropy import coordinates as coord
+from astropy import units as u
+from astropy.io import fits
+from astropy.wcs import WCS
+from astropy.coordinates import SkyCoord
+from astropy.coordinates import Angle
+from astropy.nddata import Cutout2D
+
 class ImagePull:
 
     def arrays(self):
@@ -10,7 +34,7 @@ class ImagePull:
         MCSNR = np.asarray(MCSNR)
         return MCSNR
 
-    def ra2dec(self):
+    def eq2deg(self):
         # debug for function
         x = [Ra.decode('UTF-8') for Ra in RA]
         y = [Dec.decode('UTF-8') for Dec in DE]
