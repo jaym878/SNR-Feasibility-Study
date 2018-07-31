@@ -75,27 +75,33 @@ def parse_cat_file(filename, src_num):
 
 # get SNR properties
 SNR = 34 # position in list
-
 MCSNR, RA, DE, Rad, kT, VShock, Age, LX, LIR = parse_cat_file('SNR_list.csv', SNR)
-
-
-# instrument things
 instrument_list = ['IRAC', 'MIPS']
+sensor = 'IRAC'
+b = 8.0
+my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
+my_test.run()
+#for SNR in range(len(np.genfromtxt(open('SNR_list.csv', "r"), names=True, delimiter=',', dtype=None))):
+    
 
-# Select Instrument and Band
-for sensor in instrument_list:
-    if sensor == 'IRAC':
-        band_list = [3.6, 4.5, 5.8, 8.0]
-        for b in band_list:
-            # Run image pull as object
-            my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
-            my_test.run()
-
-    if sensor == 'MIPS':
-        band_list = [24., 70., 160.]
-        for b in band_list:
-            # Run image pull as object
-            my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
-            my_test.run()
+#    MCSNR, RA, DE, Rad, kT, VShock, Age, LX, LIR = parse_cat_file('SNR_list.csv', SNR)
 
 
+#    # instrument things
+#    instrument_list = ['IRAC', 'MIPS']
+
+    # Select Instrument and Band
+#    for sensor in instrument_list:
+#        if sensor == 'IRAC':
+#            band_list = [3.6, 4.5, 5.8, 8.0]
+#            for b in band_list:
+#                # Run image pull as object
+#                my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
+#                my_test.run()
+
+#        if sensor == 'MIPS':
+#            band_list = [24., 70., 160.]
+#            for b in band_list:
+#                # Run image pull as object
+#                my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
+#                my_test.run()
