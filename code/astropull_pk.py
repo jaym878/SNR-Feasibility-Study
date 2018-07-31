@@ -203,7 +203,7 @@ class ImagePull:
 
         fig.savefig(plot_name, dpi=200)
 
-    def show_image(self, MCSNR, test_src_coord, wavelength):
+    def show_image(self, Rad, MCSNR, test_src_coord, wavelength):
         """
         what does this do, return
         """
@@ -217,8 +217,19 @@ class ImagePull:
             header = hdulist[0].header
             data = hdulist[0].data
             wcs = WCS(header)
-            self.plot_image(data, wcs, coords=test_src_coord)
+            size = self.radius * 2
+            arc_pix = header['PXSCAL1']
+            if arc_pix < 0:
+                arc_pix = -arc_pix
+            size_pix = size / arc_pix
+               
+            position = SkyCoord(test_src_coord[0] * u.degree, test_src_coord[1] * u.degree, frame='icrs')
+            cutout = Cutout2D(data, position, (size), wcs=wcs)
 
+        #plt.imshow(cutout.data, origin='lower')
+        #plt.tight_layout()
+        #plt.show()
+            self.plot_image(cutout.data, cutout.wcs, coords=test_src_coord)
         return my_image_file
 
     def ap_phot(self, my_image_files, Rad, test_src_coord, wavelength):
@@ -281,21 +292,20 @@ class ImagePull:
         # TODO: These wavebands should be converted to Hz before getting
         # TODO: difference between upper and lower bounds
         if wavelength == 3.6:
-            band = 3.9-3.1
+            band = 9.671e13 - 7.687e13
         if wavelength == 4.5:
-            band = 5.0-3.9
+            band = 7.687e13 - 5.996e13
         if wavelength == 5.8:
-            band = 6.2-4.9
+            band = 6.118e13 - 4.835e13
         if wavelength == 8.0:
-            band = 9.3-6.2
+            band = 4.835e13 - 3.224e13
         if wavelength == 24:
-            band = 28-20
+            band = 1.499e13 - 1.070e13
         if wavelength == 70:
-            band = 90-50
+            band = 5.996e12 - 3.331e12
         if wavelength == 160:
-            band = 190-130
-        f = 300000000/(band*10**6)
-        fluxIR = erg * f
+            band = 2.306e12 - 1.578e12
+        fluxIR = erg * band
         FluxIR = fluxIR[0]
 
         return FluxIR
@@ -315,7 +325,7 @@ class ImagePull:
 
         # Plot Image function
         # cycle through images
-        my_image_file = self.show_image(self.name, test_src_coord, self.wavelength)
+        my_image_file = self.show_image(self.radius, self.name, test_src_coord, self.wavelength)
 
         # Ap Phot Function
         flux = self.ap_phot(my_image_file, self.radius, test_src_coord, self.wavelength)
