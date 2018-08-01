@@ -226,11 +226,8 @@ class ImagePull:
             position = SkyCoord(test_src_coord[0] * u.degree, test_src_coord[1] * u.degree, frame='icrs')
             cutout = Cutout2D(data, position, (size), wcs=wcs)
 
-        #plt.imshow(cutout.data, origin='lower')
-        #plt.tight_layout()
-        #plt.show()
             self.plot_image(cutout.data, cutout.wcs, coords=test_src_coord)
-        return my_image_file
+        return my_image_files
 
     def ap_phot(self, my_image_files, Rad, test_src_coord, wavelength):
         """
@@ -285,7 +282,7 @@ class ImagePull:
 
         unit = flux * 23.5045
         ap_ar = np.pi * Rad**2
-        jan = unit * ap_ar
+        jan = unit / ap_ar
         erg = jan * 10**-17
         band_list = [3.6, 4.5, 5.8, 8.0, 24, 70, 160]
 
@@ -329,7 +326,9 @@ class ImagePull:
 
         # Ap Phot Function
         flux = self.ap_phot(my_image_file, self.radius, test_src_coord, self.wavelength)
+        
+        return flux[0]
 
-        print("Flux determined for {} in {}-{}:".format(self.name, self.sensor, self.wavelength))
-        print("{0:0.2e}".format(flux[0]))
+        #print("Flux determined for {} in {}:{}:".format(self.name, self.sensor, self.wavelength))
+        #print("{0:0.2e}".format(flux[0]))
 

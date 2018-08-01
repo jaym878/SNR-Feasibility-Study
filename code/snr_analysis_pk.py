@@ -74,30 +74,43 @@ def parse_cat_file(filename, src_num):
 
 
 # get SNR properties
-SNR = 34 # position in list
-MCSNR, RA, DE, Rad, kT, VShock, Age, LX, LIR = parse_cat_file('SNR_list.csv', SNR)
+#SNR = 34 # position in list
+#MCSNR, RA, DE, Rad, kT, VShock, Age, LX, LIR = parse_cat_file('/home/murphyj/Desktop/Coding/SNR_list.csv', SNR)
+#instrument_list = ['IRAC', 'MIPS']
+#sensor = 'IRAC'
+#b = 8.0
+#my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
+#FluxIR = my_test.run()
+
+#for SNR in range(len(np.genfromtxt(open('/home/murphyj/Desktop/Coding/SNR_list.csv', "r"), names=True, delimiter=',', dtype=None))):
+SNR = 34 # position in list  
+name = []
+ra = []
+dec = []
+rad = []
+flux = []
+wl = []
+
+MCSNR, RA, DE, Rad, kT, VShock, Age, LX, LIR = parse_cat_file('/home/murphyj/Desktop/Coding/SNR_list.csv', SNR)
+
+
+    # instrument things
 instrument_list = ['IRAC', 'MIPS']
-sensor = 'IRAC'
-b = 8.0
-my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
-my_test.run()
-#for SNR in range(len(np.genfromtxt(open('SNR_list.csv', "r"), names=True, delimiter=',', dtype=None))):
-    
-
-#    MCSNR, RA, DE, Rad, kT, VShock, Age, LX, LIR = parse_cat_file('SNR_list.csv', SNR)
-
-
-#    # instrument things
-#    instrument_list = ['IRAC', 'MIPS']
 
     # Select Instrument and Band
-#    for sensor in instrument_list:
-#        if sensor == 'IRAC':
-#            band_list = [3.6, 4.5, 5.8, 8.0]
-#            for b in band_list:
-#                # Run image pull as object
-#                my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
-#                my_test.run()
+for sensor in instrument_list:
+    if sensor == 'IRAC':
+        band_list = [3.6, 4.5, 5.8, 8.0]
+        for b in band_list:
+                # Run image pull as object
+            my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
+            FluxIR = my_test.run()
+            name.append(MCSNR)
+            ra.append(RA)
+            dec.append(DE)
+            rad.append(Rad)
+            wl.append(b)
+            flux.append(FluxIR)
 
 #        if sensor == 'MIPS':
 #            band_list = [24., 70., 160.]
@@ -105,3 +118,13 @@ my_test.run()
 #                # Run image pull as object
 #                my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
 #                my_test.run()
+#                name.append(MCSNR)
+#                ra.append(RA)
+#                dec.append(DE)
+#                rad.append(Rad)
+#                wl.append(b)
+#                flux.append(FluxIR)
+    #Change file location and edit for multiple values
+#    text_file = open("Output.txt", "w")
+#    text_file.write(flux)
+#    text_file.close()
