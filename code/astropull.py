@@ -25,16 +25,70 @@ from astropy.nddata import Cutout2D
 
 
 class ImagePull:
+    """
+    ImagePull references the Spitzer Heritage Archive using supplied coordinates to pull images 
+    from both the IRAC and MIPS sensor wavebands. The class then applies cuts and aperture photometry to derive fluxes of targets.
+    Write what this class does in the doc string here. Include whatever input it needs and what it outputs
 
-    def arrays(pos, line):
-        list = []
-        num = line.shape[0]
-        for n in range(num):
-            list.append(line[n][pos])
-        list = np.asarray(list)
-        return list
+    Input
+    ==========================
+    name (str):
+        name of the SNR
 
-    def eq2deg(RA, DE):
+    ra (float):
+        ra of the SNR
+
+    dec (float):
+        dec of the SNR
+
+    radius (float):
+        radius of the SNR in units of arcseconds
+
+    sensor (str):
+        Spitzer detector (options are IRAC and MIPS)
+
+    wavelength (float):
+        Spitzer filter required (options are: 3.6, 4.5, 5.8, 8.0, 24., 70., 160.)
+
+
+    Output
+    ==========================
+    cut images:
+        saved pdf images of target in selected wavebands
+    
+    FluxIR (float):
+        flux returned in units of erg/s/cm^2
+    """
+    def __init__(self, name, ra, dec, radius, sensor, wavelength):
+        # load input parameters to attributes
+        self.name = name
+        self.ra = ra
+        self.dec = dec
+        self.radius = radius
+        self.sensor = sensor
+        self.wavelength = wavelength
+
+
+    def eq2deg(self, RA, DE):
+        """
+        eq2deg converts a string of eq coordinates to a decimal degree equivelant
+        
+        Input
+        ==========================
+        RA (str):
+            ra in units of h/m/s
+            
+        DE (str):
+            dec in units of d/m/s
+            
+        Output
+        ==========================
+        im_ra_deg (float):
+            ra in units of decimal degrees
+            
+        im_dec_deg (float):
+            dec in units of decimal degrees
+        """
         # debug for function
         x = RA.decode('UTF-8')
         y = DE.decode('UTF-8')
@@ -56,7 +110,25 @@ class ImagePull:
 
         return im_ra_deg, im_dec_deg
 
-    def query(test_src_coord, sensor, wavelength):
+    def query(self, test_src_coord, sensor, wavelength):
+        """
+        eq2deg converts a string of eq coordinates to a decimal degree equivelant
+        
+        Input
+        ==========================
+        test_src_coord (float):
+            coordinates of SNR in decimal degrees
+            
+        sensor (str):
+            sensor name
+            
+        wavelength (str):
+            waveband for sensor
+            
+        Output
+        ==========================
+        querys SHA database and downloads .fits files into test folders
+        """
         my_query = sha.query(coord=coord.SkyCoord(ra=test_src_coord[0], dec=test_src_coord[1],
                                                   unit=(u.degree, u.degree)), size=0.001)
 
@@ -93,20 +165,35 @@ class ImagePull:
             closest = np.argmin(distance_check)
             my_final_row = tbl[closest]
             url = my_final_row['accessUrl'].strip()
-            sha.save_file(url, out_dir='test_files' + '_' + str(wavelength) + '/')
+            sha.save_file(url, out_dir=str(self.name) + '_' + str(wavelength) + '/')
 
         elif sensor == 'MIPS':
             for i in tbl['accessUrl']:
                 print("Getting: {}".format(i))
                 url = i.strip()
-                sha.save_file(url, out_dir='test_files' + '_' + str(wavelength)+ '/')
+                sha.save_file(url, out_dir=str(self.name) + '_' + str(wavelength)+ '/')
 
-    def cuts(wavelength, sensor, MCSNR):
+    def cuts(self, wavelength, sensor, MCSNR):
+        """
+        cuts only downloads wanted images from IRAC and removes unwanted images from MIPS
+        
+        Input
+        ==========================
+        MCSNR (str):
+            name of SNR
+            
+        sensor (str):
+            sensor name
+            
+        wavelength (str):
+            waveband for sensor
+            
+        """
 
         sensor_l=len(sensor)+1
         sens=sensor.rjust(sensor_l)
         name = str(sens) + ' ' + str(wavelength) + 'um'
-        my_image_files = glob.glob(os.path.join('test_files_' + str(wavelength), '*.fits'))
+        my_image_files = glob.glob(os.path.join(str(self.name) + '_' + str(wavelength), '*.fits'))
         n_images = len(my_image_files)
         counter = 0
         filename = sens[1:] + '_' + str(wavelength) + '.fits'
@@ -124,11 +211,11 @@ class ImagePull:
             if not os.path.exists(os.path.join(MCSNR)):
                 os.makedirs(os.path.join(MCSNR))
             if os.path.exists(os.path.join(my_image_files[i])):
-                copyfile(os.path.join(my_image_files[i]), os.path.join((MCSNR).decode("utf-8") + '/' + filename))
+                copyfile(os.path.join(my_image_files[i]), os.path.join(MCSNR + '/' + filename))
 
-        rmtree(os.path.join('test_files' + '_'+ str(wavelength) + '/'))
+        rmtree(os.path.join(str(self.name) + '_' + str(wavelength) + '/'))
 
-    def plot_image(data, wcs, coords=None):
+    def plot_image(self, data, wcs, coords=None):
         """
         convience function to plot data on a wcs projection
 
@@ -154,29 +241,54 @@ class ImagePull:
 
         # display the plot
         plt.tight_layout()
-        plt.show()
 
-    def show_image(MCSNR, test_src_coord):
-        my_image_files = glob.glob(os.path.join(MCSNR.decode("utf-8"), '*.fits'))
-        for i in my_image_files:
+        # save as a pdf
+        plot_name = os.path.join(str(self.name), str(self.name) + '_' +
+                                 str(self.wavelength) + '.pdf')
+        try:
+            os.remove(plot_name)
+        except:
+            pass
+
+        fig.savefig(plot_name, dpi=200)
+
+    def show_image(self, Rad, MCSNR, test_src_coord, wavelength):
+        """
+        what does this do, return
+        """
+        my_image_files = glob.glob(os.path.join(MCSNR, '*.fits'))
+        for f in my_image_files:
+            if str(wavelength) in f:
+                my_image_file = f
 
         # load the file data, header, and wcs
-            with fits.open(i) as hdulist:
-                header = hdulist[0].header
-                data = hdulist[0].data
-                wcs = WCS(header)
-                ImagePull.plot_image(data, wcs, coords=test_src_coord)
+        with fits.open(my_image_file) as hdulist:
+            header = hdulist[0].header
+            data = hdulist[0].data
+            wcs = WCS(header)
+            size = self.radius * 2
+            arc_pix = header['PXSCAL1']
+            if arc_pix < 0:
+                arc_pix = -arc_pix
+            size_pix = size / arc_pix
+               
+            position = SkyCoord(test_src_coord[0] * u.degree, test_src_coord[1] * u.degree, frame='icrs')
+            cutout = Cutout2D(data, position, (size), wcs=wcs)
 
+            self.plot_image(cutout.data, cutout.wcs, coords=test_src_coord)
         return my_image_files
 
-    def ap_phot(my_image_files, Rad, test_src_coord, wavelength):
+    def ap_phot(self, my_image_files, Rad, test_src_coord, wavelength):
+        """
+        what does this do, return
+        """
 
         fluxes = []
         fluxesav = []
         im_name = []
         for i in my_image_files:
     
-    # load the file data, header, and wcs
+            # load the file data, header, and wcs
             with fits.open(i) as hdulist:
                 my_hdu = hdulist[0]
                 my_hdu.data = np.nan_to_num(my_hdu.data)
@@ -185,13 +297,13 @@ class ImagePull:
                 position = SkyCoord(test_src_coord[0] * u.degree, test_src_coord[1] * u.degree, frame='icrs')
                 apertures = SkyCircularAperture(position, r=Rad * u.arcsec)
         
-        #print(apertures)
+                #print(apertures)
                 phot_table = aperture_photometry(my_hdu, apertures)
 
-        #todo debug
-        #onverted_aperture_sum = (phot_table['aperture_sum'] * arc_pix)
+                #todo debug
+                #onverted_aperture_sum = (phot_table['aperture_sum'] * arc_pix)
                 fluxes.append(phot_table['aperture_sum'])
-        #im_name.append(my_image_files(i))
+                #im_name.append(my_image_files(i))
         
                 x = Angle(Rad, u.arcsec)
                 y = 2 * x.degree
@@ -219,25 +331,53 @@ class ImagePull:
 
         unit = flux * 23.5045
         ap_ar = np.pi * Rad**2
-        jan = unit * ap_ar
+        jan = unit / ap_ar
         erg = jan * 10**-17
         band_list = [3.6, 4.5, 5.8, 8.0, 24, 70, 160]
+
+        # TODO: These wavebands should be converted to Hz before getting
+        # TODO: difference between upper and lower bounds
         if wavelength == 3.6:
-            band = 3.9-3.1
+            band = 9.671e13 - 7.687e13
         if wavelength == 4.5:
-            band = 5.0-3.9
+            band = 7.687e13 - 5.996e13
         if wavelength == 5.8:
-            band = 6.2-4.9
+            band = 6.118e13 - 4.835e13
         if wavelength == 8.0:
-            band = 9.3-6.2
+            band = 4.835e13 - 3.224e13
         if wavelength == 24:
-            band = 28-20
+            band = 1.499e13 - 1.070e13
         if wavelength == 70:
-            band = 90-50
+            band = 5.996e12 - 3.331e12
         if wavelength == 160:
-            band = 190-130
-        f = 300000000/(band*10**6)
-        fluxIR = erg * f
+            band = 2.306e12 - 1.578e12
+        fluxIR = erg * band
         FluxIR = fluxIR[0]
 
         return FluxIR
+
+    def run(self):
+        """
+        run the class methods
+        """
+        # Eq2Deg Function
+        test_src_coord = self.eq2deg(self.ra, self.dec)
+
+        # Query Function
+        self.query(test_src_coord, self.sensor, self.wavelength)
+
+        # Cuts Function
+        self.cuts(self.wavelength, self.sensor, self.name)
+
+        # Plot Image function
+        # cycle through images
+        my_image_file = self.show_image(self.radius, self.name, test_src_coord, self.wavelength)
+
+        # Ap Phot Function
+        flux = self.ap_phot(my_image_file, self.radius, test_src_coord, self.wavelength)
+        
+        return flux[0]
+
+        #print("Flux determined for {} in {}:{}:".format(self.name, self.sensor, self.wavelength))
+        #print("{0:0.2e}".format(flux[0]))
+
