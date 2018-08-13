@@ -125,9 +125,6 @@ class ImagePull:
         wavelength (str):
             waveband for sensor
             
-        Output
-        ==========================
-        querys SHA database and downloads .fits files into test folders
         """
         my_query = sha.query(coord=coord.SkyCoord(ra=test_src_coord[0], dec=test_src_coord[1],
                                                   unit=(u.degree, u.degree)), size=0.001)
@@ -215,7 +212,7 @@ class ImagePull:
 
         rmtree(os.path.join(str(self.name) + '_' + str(wavelength) + '/'))
 
-    def plot_image(self, data, wcs, coords=None):
+    def plot_image(self, radius, data, wcs, coords=None):
         """
         convience function to plot data on a wcs projection
 
@@ -232,7 +229,7 @@ class ImagePull:
 
         # plot
         axs.imshow(data, cmap='jet', interpolation='nearest', origin='lower', norm=LogNorm(vmin=vmin))
-        axs.scatter(coords[0], coords[1], transform=axs.get_transform('fk5'), s=300, lw=3,
+        axs.scatter(coords[0], coords[1], transform=axs.get_transform('fk5'), s=20000, lw=2,
                     edgecolor='white', facecolor='none')
         axs.set_facecolor('black')
         axs.coords.grid(True, color='white', ls='dotted')
@@ -252,9 +249,9 @@ class ImagePull:
 
         fig.savefig(plot_name, dpi=200)
 
-    def show_image(self, Rad, MCSNR, test_src_coord, wavelength):
+    def show_image(self, MCSNR, test_src_coord, wavelength):
         """
-        what does this do, return
+        show_image plots cut images for the user to see when running the program
         """
         my_image_files = glob.glob(os.path.join(MCSNR, '*.fits'))
         for f in my_image_files:
@@ -266,21 +263,50 @@ class ImagePull:
             header = hdulist[0].header
             data = hdulist[0].data
             wcs = WCS(header)
-            size = self.radius * 2
+            size = self.radius * 4
             arc_pix = header['PXSCAL1']
             if arc_pix < 0:
                 arc_pix = -arc_pix
             size_pix = size / arc_pix
+            factor = 1
+            if size_pix in range(100,200):
+                factor = (2160/162)
+            if size_pix in range(300,400):
+                factor = (2160/324)
+            if size_pix in range(500,600):
+                factor = (2160/529)
+            im_size = size * factor
                
             position = SkyCoord(test_src_coord[0] * u.degree, test_src_coord[1] * u.degree, frame='icrs')
-            cutout = Cutout2D(data, position, (size), wcs=wcs)
+            cutout = Cutout2D(data, position, (im_size), wcs=wcs)
 
             self.plot_image(cutout.data, cutout.wcs, coords=test_src_coord)
         return my_image_files
 
     def ap_phot(self, my_image_files, Rad, test_src_coord, wavelength):
         """
-        what does this do, return
+        ap_phot applies aperture photometry to calculate the flux of the source. It creates a circle aperture around
+        the source referencing the radius of the snr as the radius of the circular aperture. It also creates 4 more
+        apertures away from the source which are then averaged and subtracted from the target flux to remove background
+
+        Input
+        ==========================
+        my_image_files (.fits):
+            .fits file from coordinates
+
+        Rad (float):
+            radius in units of arcsec
+
+        test_src_coord (float):
+            coordinates of target in decimal degrees
+
+        wavelength (float):
+            waveband in units of um
+
+        Output
+        ==========================
+        FluxIR (float):
+            calculated flux in units of erg/s/cm^2
         """
 
         fluxes = []
@@ -296,14 +322,10 @@ class ImagePull:
         
                 position = SkyCoord(test_src_coord[0] * u.degree, test_src_coord[1] * u.degree, frame='icrs')
                 apertures = SkyCircularAperture(position, r=Rad * u.arcsec)
-        
-                #print(apertures)
+
                 phot_table = aperture_photometry(my_hdu, apertures)
 
-                #todo debug
-                #onverted_aperture_sum = (phot_table['aperture_sum'] * arc_pix)
                 fluxes.append(phot_table['aperture_sum'])
-                #im_name.append(my_image_files(i))
         
                 x = Angle(Rad, u.arcsec)
                 y = 2 * x.degree
@@ -335,8 +357,6 @@ class ImagePull:
         erg = jan * 10**-17
         band_list = [3.6, 4.5, 5.8, 8.0, 24, 70, 160]
 
-        # TODO: These wavebands should be converted to Hz before getting
-        # TODO: difference between upper and lower bounds
         if wavelength == 3.6:
             band = 9.671e13 - 7.687e13
         if wavelength == 4.5:
@@ -355,6 +375,67 @@ class ImagePull:
         FluxIR = fluxIR[0]
 
         return FluxIR
+    
+    def flux_arc(self, my_image_files, Rad, test_src_coord, wavelength):
+        
+        fluxes = []
+        fluxesav = []
+        im_name = []
+        for i in my_image_files:
+    
+            # load the file data, header, and wcs
+            with fits.open(i) as hdulist:
+                my_hdu = hdulist[0]
+                my_hdu.data = np.nan_to_num(my_hdu.data)
+                r = Rad * u.arcsec
+
+                x = Angle(self.Rad, u.arcsec)
+                y = 2 * x.degree
+
+                t1_pos = SkyCoord((test_src_coord[0] + y) * u.degree, (test_src_coord[1] + y) * u.degree, frame='icrs')
+                t2_pos = SkyCoord((test_src_coord[0] + y) * u.degree, (test_src_coord[1] - y) * u.degree, frame='icrs')
+                t3_pos = SkyCoord((test_src_coord[0] - y) * u.degree, (test_src_coord[1] + y) * u.degree, frame='icrs')
+                t4_pos = SkyCoord((test_src_coord[0] - y) * u.degree, (test_src_coord[1] - y) * u.degree, frame='icrs')
+
+                ap1 = SkyRectangularAperture((t1_pos, 60 * u.arcsec, 120 * u.arcsec))
+                ap2 = SkyRectangularAperture((t1_pos, 60 * u.arcsec, 120 * u.arcsec))
+                ap3 = SkyRectangularAperture((t1_pos, 60 * u.arcsec, 120 * u.arcsec))
+                ap4 = SkyRectangularAperture((t1_pos, 60 * u.arcsec, 120 * u.arcsec))
+
+                phot_table1 = aperture_photometry(my_hdu, ap1)
+                fluxesav.append(phot_table1['aperture_sum'])
+                phot_table2 = aperture_photometry(my_hdu, ap2)
+                fluxesav.append(phot_table2['aperture_sum'])
+                phot_table3 = aperture_photometry(my_hdu, ap3)
+                fluxesav.append(phot_table3['aperture_sum'])
+                phot_table4 = aperture_photometry(my_hdu, ap4)
+                fluxesav.append(phot_table4['aperture_sum'])
+                average = np.mean(fluxesav)
+    
+        unit = flux * 23.5045
+        ap_ar = np.pi * Rad**2
+        jan = unit / ap_ar
+        erg = jan * 10**-17
+        band_list = [3.6, 4.5, 5.8, 8.0, 24, 70, 160]
+
+        if wavelength == 3.6:
+            band = 9.671e13 - 7.687e13
+        if wavelength == 4.5:
+            band = 7.687e13 - 5.996e13
+        if wavelength == 5.8:
+            band = 6.118e13 - 4.835e13
+        if wavelength == 8.0:
+            band = 4.835e13 - 3.224e13
+        if wavelength == 24:
+            band = 1.499e13 - 1.070e13
+        if wavelength == 70:
+            band = 5.996e12 - 3.331e12
+        if wavelength == 160:
+            band = 2.306e12 - 1.578e12
+        fluxIR = erg * band
+        FluxIR = fluxIR[0]
+        
+        return FluxIR
 
     def run(self):
         """
@@ -370,14 +451,10 @@ class ImagePull:
         self.cuts(self.wavelength, self.sensor, self.name)
 
         # Plot Image function
-        # cycle through images
-        my_image_file = self.show_image(self.radius, self.name, test_src_coord, self.wavelength)
+
+        my_image_file = self.show_image(self.name, test_src_coord, self.wavelength)
 
         # Ap Phot Function
         flux = self.ap_phot(my_image_file, self.radius, test_src_coord, self.wavelength)
         
         return flux[0]
-
-        #print("Flux determined for {} in {}:{}:".format(self.name, self.sensor, self.wavelength))
-        #print("{0:0.2e}".format(flux[0]))
-
