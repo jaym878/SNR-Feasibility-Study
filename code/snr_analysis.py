@@ -75,46 +75,50 @@ def parse_cat_file(filename, src_num):
 
 
 # get SNR properties
-#SNR = 34 # position in list
+SNR = 34 # position in list
 #MCSNR, RA, DE, Rad, kT, VShock, Age, LX, LIR = parse_cat_file('/home/murphyj/Desktop/Coding/SNR_list.csv', SNR)
 #instrument_list = ['IRAC', 'MIPS']
-#sensor = 'IRAC'
-#b = 8.0
+#sensor = instrument_list[1]
+#b = 24
 #my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
 #FluxIR = my_test.run()
 
-for SNR in range(len(np.genfromtxt(open(os.path.join('SNR_list.csv'), "r"), names=True, delimiter=',', dtype=None))):
+#for SNR in range(len(np.genfromtxt(open('/home/murphyj/Desktop/Coding/SNR_list.csv', "r"), names=True, delimiter=',', dtype=None))):
 
-    MCSNR, RA, DE, Rad, kT, VShock, Age, LX, LIR = parse_cat_file(os.path.join('SNR_list.csv', SNR))
+MCSNR, RA, DE, Rad, kT, VShock, Age, LX, LIR = parse_cat_file('/home/murphyj/Desktop/Coding/SNR_list.csv', SNR)
 
 
     # instrument things
-    instrument_list = ['IRAC', 'MIPS']
+instrument_list = ['IRAC', 'MIPS']
 
     # Select Instrument and Band
-    for sensor in instrument_list:
-        flux = []
+for sensor in instrument_list:
+    flux = []
+    arc_flux = []
     
-        if sensor == 'IRAC':
-            band_list = [3.6, 4.5, 5.8, 8.0]
-            for b in band_list:
-                # Run image pull as object
-                my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
-                FluxIR = my_test.run()
-                flux.append(FluxIR)
-            with open('flux_template_irac.txt', 'w') as filehandle:  
-                filehandle.writelines("%s\n" % place for place in band_list)
-            with open(os.path.join(str(MCSNR) + '/fluxes_' + str(MCSNR) + '_' + str(sensor) + '.txt'), 'w') as filehandle:  
-                filehandle.writelines("%s\n" % place for place in flux)
+    if sensor == 'IRAC':
+        band_list = [3.6]#, 4.5, 5.8, 8.0]
+        for b in band_list:
+            # Run image pull as object
+            my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
+            ret = my_test.run()
+            FluxIR = ret[0]
+            flux_lim = ret[1]
+            
+            flux.append(FluxIR)
+        with open('flux_template_irac.txt', 'w') as filehandle:  
+            filehandle.writelines("%s\n" % place for place in band_list)
+        with open(os.path.join(str(MCSNR) + '/fluxes_' + str(MCSNR) + '_' + str(sensor) + '.txt'), 'w') as filehandle:  
+            filehandle.writelines("%s\n" % place for place in flux)
 
-        if sensor == 'MIPS':
-            band_list = [24., 70., 160.]
-            for b in band_list:
-                # Run image pull as object
-                my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
-                my_test.run()
-                flux.append(FluxIR)
-            with open('flux_template_mips.txt', 'w') as filehandle:  
-                filehandle.writelines("%s\n" % place for place in band_list)
-            with open(os.path.join(str(name[0]) + '/fluxes_' + str(name[0]) + '_' + str(sensor) + '.txt'), 'w') as filehandle:  
-                filehandle.writelines("%s\n" % place for place in flux)
+#    if sensor == 'MIPS':
+#        band_list = [24, 70, 160]
+#        for b in band_list:
+#            # Run image pull as object
+#            my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
+#            FluxIR = my_test.run()
+#            flux.append(FluxIR)
+#        with open('flux_template_mips.txt', 'w') as filehandle:  
+#            filehandle.writelines("%s\n" % place for place in band_list)
+#        with open(os.path.join(str(MCSNR) + '/fluxes_' + str(MCSNR) + '_' + str(sensor) + '.txt'), 'w') as filehandle:  
+#            filehandle.writelines("%s\n" % place for place in flux)

@@ -4,6 +4,7 @@ import os, glob
 from pprint import pprint
 from shutil import copyfile, rmtree
 from photutils import SkyCircularAperture
+from photutils import SkyRectangularAperture
 from photutils import aperture_photometry
 from photutils import datasets
 
@@ -212,7 +213,7 @@ class ImagePull:
 
         rmtree(os.path.join(str(self.name) + '_' + str(wavelength) + '/'))
 
-    def plot_image(self, radius, data, wcs, coords=None):
+    def plot_image(self, data, wcs, coords=None):
         """
         convience function to plot data on a wcs projection
 
@@ -389,7 +390,7 @@ class ImagePull:
                 my_hdu.data = np.nan_to_num(my_hdu.data)
                 r = Rad * u.arcsec
 
-                x = Angle(self.Rad, u.arcsec)
+                x = Angle(Rad, u.arcsec)
                 y = 2 * x.degree
 
                 t1_pos = SkyCoord((test_src_coord[0] + y) * u.degree, (test_src_coord[1] + y) * u.degree, frame='icrs')
@@ -397,10 +398,10 @@ class ImagePull:
                 t3_pos = SkyCoord((test_src_coord[0] - y) * u.degree, (test_src_coord[1] + y) * u.degree, frame='icrs')
                 t4_pos = SkyCoord((test_src_coord[0] - y) * u.degree, (test_src_coord[1] - y) * u.degree, frame='icrs')
 
-                ap1 = SkyRectangularAperture((t1_pos, 60 * u.arcsec, 120 * u.arcsec))
-                ap2 = SkyRectangularAperture((t1_pos, 60 * u.arcsec, 120 * u.arcsec))
-                ap3 = SkyRectangularAperture((t1_pos, 60 * u.arcsec, 120 * u.arcsec))
-                ap4 = SkyRectangularAperture((t1_pos, 60 * u.arcsec, 120 * u.arcsec))
+                ap1 = SkyRectangularAperture((t1_pos, 60 * u.arcsec, 120 * u.arcsec, 0))
+                ap2 = SkyRectangularAperture((t1_pos, 60 * u.arcsec, 120 * u.arcsec, 0))
+                ap3 = SkyRectangularAperture((t1_pos, 60 * u.arcsec, 120 * u.arcsec, 0))
+                ap4 = SkyRectangularAperture((t1_pos, 60 * u.arcsec, 120 * u.arcsec, 0))
 
                 phot_table1 = aperture_photometry(my_hdu, ap1)
                 fluxesav.append(phot_table1['aperture_sum'])
@@ -411,31 +412,39 @@ class ImagePull:
                 phot_table4 = aperture_photometry(my_hdu, ap4)
                 fluxesav.append(phot_table4['aperture_sum'])
                 average = np.mean(fluxesav)
-    
-        unit = flux * 23.5045
-        ap_ar = np.pi * Rad**2
-        jan = unit / ap_ar
-        erg = jan * 10**-17
-        band_list = [3.6, 4.5, 5.8, 8.0, 24, 70, 160]
-
-        if wavelength == 3.6:
-            band = 9.671e13 - 7.687e13
-        if wavelength == 4.5:
-            band = 7.687e13 - 5.996e13
-        if wavelength == 5.8:
-            band = 6.118e13 - 4.835e13
-        if wavelength == 8.0:
-            band = 4.835e13 - 3.224e13
-        if wavelength == 24:
-            band = 1.499e13 - 1.070e13
-        if wavelength == 70:
-            band = 5.996e12 - 3.331e12
-        if wavelength == 160:
-            band = 2.306e12 - 1.578e12
-        fluxIR = erg * band
-        FluxIR = fluxIR[0]
+                high = max(fluxesav)
+                low = min(fluxesav)
+                fluxes = [high[0], low[0]]
+                
+        array = []
         
-        return FluxIR
+        for flux in fluxes:
+            
+            unit = flux * 23.5045
+            ap_ar = np.pi * Rad**2
+            jan = unit / ap_ar
+            erg = jan * 10**-17
+
+            if wavelength == 3.6:
+                band = 9.671e13 - 7.687e13
+            if wavelength == 4.5:
+                band = 7.687e13 - 5.996e13
+            if wavelength == 5.8:
+                band = 6.118e13 - 4.835e13
+            if wavelength == 8.0:
+                band = 4.835e13 - 3.224e13
+            if wavelength == 24:
+                band = 1.499e13 - 1.070e13
+            if wavelength == 70:
+                band = 5.996e12 - 3.331e12
+            if wavelength == 160:
+                band = 2.306e12 - 1.578e12
+            fluxIR = erg * band
+            array.append(fluxIR)
+            
+        return array
+        
+        
 
     def run(self):
         """
@@ -457,4 +466,6 @@ class ImagePull:
         # Ap Phot Function
         flux = self.ap_phot(my_image_file, self.radius, test_src_coord, self.wavelength)
         
-        return flux[0]
+        flux_lim = self.flux_arc(my_image_file, self.radius, test_src_coord, self.wavelength) 
+        
+        return flux, flux_lim
