@@ -560,7 +560,7 @@ class ImagePull:
                 average = np.mean(fluxesav)
                 high = max(fluxesav)
                 low = min(fluxesav)
-                fluxes = [high[0], low[0]]
+                fluxes = [high, low]
                 
         array = []
         
@@ -588,7 +588,7 @@ class ImagePull:
             fluxIR = erg * band
             array.append(fluxIR)
             
-        return array
+        return array[0], array[1]
         
         
 
