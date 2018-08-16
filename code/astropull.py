@@ -69,6 +69,9 @@ class ImagePull:
         self.sensor = sensor
         self.wavelength = wavelength
 
+        self.ra_deg = None
+        self.dec_deg = None
+
 
     def eq2deg(self, RA, DE):
         """
@@ -108,6 +111,9 @@ class ImagePull:
 
         b = Angle(im_dec)
         im_dec_deg = b.degree
+
+        self.ra_deg = im_ra_deg
+        self.dec_deg = im_dec_deg
 
         return im_ra_deg, im_dec_deg
 
@@ -171,6 +177,76 @@ class ImagePull:
                 url = i.strip()
                 sha.save_file(url, out_dir=str(self.name) + '_' + str(wavelength)+ '/')
 
+    def fill_sources(self, image, save_plot=True):
+        """
+        detect sources, mask and fill the gaps using photutils
+
+        Input
+        =========================
+
+        image (2D np array)
+            image to process
+
+        save_plot (boolean)
+            if True, saves a diagnostic plot of pre and post source removal
+
+        Returns
+        =========================
+
+        filled_image (2D np array)
+            image with sources removed and filled
+        """
+        from photutils.background import Background2D
+        from astropy.stats import gaussian_fwhm_to_sigma
+        from photutils import detect_sources
+        from astropy.convolution import Gaussian2DKernel, interpolate_replace_nans, convolve
+
+        # get the background level
+        bkg = Background2D(image, 30)
+        threshold = bkg.background + (5.0 * bkg.background_rms)
+
+        # create the size of the sources
+        sigma = 2.0 * gaussian_fwhm_to_sigma  # FWHM = 2.
+        kernel = Gaussian2DKernel(sigma, x_size=2, y_size=2)
+        kernel.normalize()
+
+        # search for the sources and create a mask
+        seg_image = detect_sources(image, threshold, npixels=5, filter_kernel=kernel)
+        source_mask = np.clip(seg_image, 0, 1)
+
+        # fill the masked source regions
+        masked_image = image.copy()
+        masked_image[source_mask > 0] = np.nan
+
+        kernel = Gaussian2DKernel(x_stddev=5)
+        filled_image = interpolate_replace_nans(masked_image, kernel)
+
+        # smooth out hard edges around filled sources
+        kernel = Gaussian2DKernel(x_stddev=3)
+        filled_image = convolve(filled_image, kernel)
+
+        # plot
+        if save_plot:
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
+
+            ax1.imshow(image, cmap='Greys', origin='lower', norm=LogNorm(vmin=0.1))
+            ax2.imshow(filled_image, cmap='Greys', origin='lower', norm=LogNorm(vmin=0.1))
+
+            # display the plot
+            plt.tight_layout()
+
+            # save as a pdf
+            plot_name = os.path.join(str(self.name), str(self.name) + '_' +
+                                     str(self.wavelength) + '_source_removal.pdf')
+            try:
+                os.remove(plot_name)
+            except:
+                pass
+
+            fig.savefig(plot_name, dpi=200)
+
+        return filled_image
+
     def cuts(self, wavelength, sensor, MCSNR):
         """
         cuts only downloads wanted images from IRAC and removes unwanted images from MIPS
@@ -226,12 +302,73 @@ class ImagePull:
         fig, axs = plt.subplots(1, 1, figsize=(8, 8), subplot_kw={'projection': wcs})
 
         # set up limits of the colour scale for plotting
-        vmin = 1e-2
+        vmin = 5e-2
 
         # plot
         axs.imshow(data, cmap='jet', interpolation='nearest', origin='lower', norm=LogNorm(vmin=vmin))
-        axs.scatter(coords[0], coords[1], transform=axs.get_transform('fk5'), s=20000, lw=2,
-                    edgecolor='white', facecolor='none')
+
+        #axs.scatter(coords[0], coords[1], transform=axs.get_transform('fk5'), s=20000, lw=2,
+        #            edgecolor='white', facecolor='none')
+
+        # define the apertures to plot (these are the same as in other functions)
+        # SNR
+        position = SkyCoord(self.ra_deg * u.degree, self.dec_deg * u.degree, frame='icrs')
+        snr_aperture = SkyCircularAperture(position, r=self.radius * u.arcsec)
+        snr_pix_aperture = snr_aperture.to_pixel(wcs)
+        snr_pix_aperture.plot(color='white', lw=3, alpha=1.0)
+
+        # BKG
+        x = Angle(self.radius, u.arcsec)
+        y = 2.25 * x.degree
+        z = y * 2.5
+        t1_pos = SkyCoord((self.ra_deg + z) * u.degree, (self.dec_deg) * u.degree, frame='icrs')
+        t2_pos = SkyCoord((self.ra_deg - z) * u.degree, (self.dec_deg) * u.degree, frame='icrs')
+        t3_pos = SkyCoord((self.ra_deg) * u.degree, (self.dec_deg + y) * u.degree, frame='icrs')
+        t4_pos = SkyCoord((self.ra_deg) * u.degree, (self.dec_deg - y) * u.degree, frame='icrs')
+
+        ap1 = SkyCircularAperture(t1_pos, r=self.radius * u.arcsec)
+        ap1_pix = ap1.to_pixel(wcs)
+        ap1_pix.plot(color='white', lw=4, ls='--', alpha=1.0)
+
+        ap2 = SkyCircularAperture(t2_pos, r=self.radius * u.arcsec)
+        ap2_pix = ap2.to_pixel(wcs)
+        ap2_pix.plot(color='white', lw=4, ls='--', alpha=1.0)
+
+        ap3 = SkyCircularAperture(t3_pos, r=self.radius * u.arcsec)
+        ap3_pix = ap3.to_pixel(wcs)
+        ap3_pix.plot(color='white', lw=4, ls='--', alpha=1.0)
+
+        ap4 = SkyCircularAperture(t4_pos, r=self.radius * u.arcsec)
+        ap4_pix = ap4.to_pixel(wcs)
+        ap4_pix.plot(color='white', lw=4, ls='--', alpha=1.0)
+
+
+        # MIRI Imager FOVs
+        x = Angle(self.radius, u.arcsec)
+        y = x.degree
+        z = y * 2.5
+
+        t1_pos = SkyCoord((self.ra_deg + z) * u.degree, (self.dec_deg) * u.degree, frame='icrs')
+        t2_pos = SkyCoord((self.ra_deg - z) * u.degree, (self.dec_deg) * u.degree, frame='icrs')
+        t3_pos = SkyCoord((self.ra_deg) * u.degree, (self.dec_deg + y) * u.degree, frame='icrs')
+        t4_pos = SkyCoord((self.ra_deg) * u.degree, (self.dec_deg - y) * u.degree, frame='icrs')
+
+        ap1 = SkyRectangularAperture(t1_pos, 74 * u.arcsec, 113 * u.arcsec, 90 * u.degree)
+        ap1_pix = ap1.to_pixel(wcs)
+        ap1_pix.plot(color='white', lw=5, ls=':', alpha=1.0)
+
+        ap2 = SkyRectangularAperture(t2_pos, 74 * u.arcsec, 113 * u.arcsec, 90 * u.degree)
+        ap2_pix = ap2.to_pixel(wcs)
+        ap2_pix.plot(color='white', lw=5, ls=':', alpha=1.0)
+
+        ap3 = SkyRectangularAperture(t3_pos, 74 * u.arcsec, 113 * u.arcsec, 0 * u.degree)
+        ap3_pix = ap3.to_pixel(wcs)
+        ap3_pix.plot(color='white', lw=5, ls=':', alpha=1.0)
+
+        ap4 = SkyRectangularAperture(t4_pos, 74 * u.arcsec, 113 * u.arcsec, 0 * u.degree)
+        ap4_pix = ap4.to_pixel(wcs)
+        ap4_pix.plot(color='white', lw=5, ls=':', alpha=1.0)
+
         axs.set_facecolor('black')
         axs.coords.grid(True, color='white', ls='dotted')
         axs.coords[0].set_axislabel('Right Ascension (J2000)')
@@ -276,12 +413,19 @@ class ImagePull:
                 factor = (2160/324)
             if size_pix in range(500,600):
                 factor = (2160/529)
-            im_size = size * factor
+
+            # changing to two twice the SNR diameter
+            im_size = (self.radius * 4) / arc_pix
+            im_size = int(im_size)
                
             position = SkyCoord(test_src_coord[0] * u.degree, test_src_coord[1] * u.degree, frame='icrs')
             cutout = Cutout2D(data, position, (im_size), wcs=wcs)
 
+            # fill the point sources
+            cutout.data = self.fill_sources(cutout.data, save_plot=True)
+
             self.plot_image(cutout.data, cutout.wcs, coords=test_src_coord)
+
         return my_image_files
 
     def ap_phot(self, my_image_files, Rad, test_src_coord, wavelength):
@@ -329,12 +473,13 @@ class ImagePull:
                 fluxes.append(phot_table['aperture_sum'])
         
                 x = Angle(Rad, u.arcsec)
-                y = 2 * x.degree
+                y = 2.25 * x.degree
+                z = y * 2.5
         
-                t1_pos = SkyCoord((test_src_coord[0] + y) * u.degree, (test_src_coord[1] + y) * u.degree, frame='icrs')
-                t2_pos = SkyCoord((test_src_coord[0] + y) * u.degree, (test_src_coord[1] - y) * u.degree, frame='icrs')
-                t3_pos = SkyCoord((test_src_coord[0] - y) * u.degree, (test_src_coord[1] + y) * u.degree, frame='icrs')
-                t4_pos = SkyCoord((test_src_coord[0] - y) * u.degree, (test_src_coord[1] - y) * u.degree, frame='icrs')
+                t1_pos = SkyCoord((test_src_coord[0] + z) * u.degree, (test_src_coord[1]) * u.degree, frame='icrs')
+                t2_pos = SkyCoord((test_src_coord[0] - z) * u.degree, (test_src_coord[1]) * u.degree, frame='icrs')
+                t3_pos = SkyCoord((test_src_coord[0]) * u.degree, (test_src_coord[1] + y) * u.degree, frame='icrs')
+                t4_pos = SkyCoord((test_src_coord[0]) * u.degree, (test_src_coord[1] - y) * u.degree, frame='icrs')
         
                 ap1 = SkyCircularAperture(t1_pos, r=Rad * u.arcsec)
                 ap2 = SkyCircularAperture(t2_pos, r=Rad * u.arcsec)
@@ -391,17 +536,18 @@ class ImagePull:
                 r = Rad * u.arcsec
 
                 x = Angle(Rad, u.arcsec)
-                y = 2 * x.degree
+                y = x.degree
+                z = y * 2.5
 
-                t1_pos = SkyCoord((test_src_coord[0] + y) * u.degree, (test_src_coord[1] + y) * u.degree, frame='icrs')
-                t2_pos = SkyCoord((test_src_coord[0] + y) * u.degree, (test_src_coord[1] - y) * u.degree, frame='icrs')
-                t3_pos = SkyCoord((test_src_coord[0] - y) * u.degree, (test_src_coord[1] + y) * u.degree, frame='icrs')
-                t4_pos = SkyCoord((test_src_coord[0] - y) * u.degree, (test_src_coord[1] - y) * u.degree, frame='icrs')
+                t1_pos = SkyCoord((test_src_coord[0] + z) * u.degree, (test_src_coord[1]) * u.degree, frame='icrs')
+                t2_pos = SkyCoord((test_src_coord[0] - z) * u.degree, (test_src_coord[1]) * u.degree, frame='icrs')
+                t3_pos = SkyCoord((test_src_coord[0]) * u.degree, (test_src_coord[1] + y) * u.degree, frame='icrs')
+                t4_pos = SkyCoord((test_src_coord[0]) * u.degree, (test_src_coord[1] - y) * u.degree, frame='icrs')
 
-                ap1 = SkyRectangularAperture((t1_pos, 60 * u.arcsec, 120 * u.arcsec, 0))
-                ap2 = SkyRectangularAperture((t1_pos, 60 * u.arcsec, 120 * u.arcsec, 0))
-                ap3 = SkyRectangularAperture((t1_pos, 60 * u.arcsec, 120 * u.arcsec, 0))
-                ap4 = SkyRectangularAperture((t1_pos, 60 * u.arcsec, 120 * u.arcsec, 0))
+                ap1 = SkyRectangularAperture(t1_pos, 74 * u.arcsec, 113 * u.arcsec, 90 * u.degree)
+                ap2 = SkyRectangularAperture(t2_pos, 74 * u.arcsec, 113 * u.arcsec, 90 * u.degree)
+                ap3 = SkyRectangularAperture(t3_pos, 74 * u.arcsec, 113 * u.arcsec, 0 * u.degree)
+                ap4 = SkyRectangularAperture(t4_pos, 74 * u.arcsec, 113 * u.arcsec, 0 * u.degree)
 
                 phot_table1 = aperture_photometry(my_hdu, ap1)
                 fluxesav.append(phot_table1['aperture_sum'])
@@ -460,7 +606,6 @@ class ImagePull:
         self.cuts(self.wavelength, self.sensor, self.name)
 
         # Plot Image function
-
         my_image_file = self.show_image(self.name, test_src_coord, self.wavelength)
 
         # Ap Phot Function
