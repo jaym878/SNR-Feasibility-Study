@@ -567,7 +567,7 @@ class ImagePull:
         for flux in fluxes:
             
             unit = flux * 23.5045
-            ap_ar = np.pi * Rad**2
+            ap_ar = ((113 * u.arcsec) * (90 * u.arcsec))
             jan = unit / ap_ar
             erg = jan * 10**-17
 
@@ -611,6 +611,6 @@ class ImagePull:
         # Ap Phot Function
         flux = self.ap_phot(my_image_file, self.radius, test_src_coord, self.wavelength)
         
-        flux_lim = self.flux_arc(my_image_file, self.radius, test_src_coord, self.wavelength) 
+        flux_low, flux_high = self.flux_arc(my_image_file, self.radius, test_src_coord, self.wavelength) 
         
-        return flux, flux_lim
+        return flux, flux_low, flux_high

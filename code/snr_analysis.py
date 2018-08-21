@@ -1,7 +1,10 @@
 from astropull import ImagePull
+from astropy import units as u
 import numpy as np
 import os
 
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 def arrays(pos, line):
     """
@@ -75,68 +78,80 @@ def parse_cat_file(filename, src_num):
 
 
 # get SNR properties
-#SNR = 34 # position in list
-for SNR in range(len(np.genfromtxt(open('/home/murphyj/Desktop/Coding/SNR_list.csv', "r"), names=True, delimiter=',', dtype=None))):
+SNR = 34 # position in list
+#for SNR in range(len(np.genfromtxt(open('/home/murphyj/Desktop/Coding/SNR_list.csv', "r"), names=True, delimiter=',', dtype=None))):
 
-    MCSNR, RA, DE, Rad, kT, VShock, Age, LX, LIR = parse_cat_file('/home/murphyj/Desktop/Coding/SNR_list.csv', SNR)
+MCSNR, RA, DE, Rad, kT, VShock, Age, LX, LIR = parse_cat_file('/home/murphyj/Desktop/Coding/SNR_list.csv', SNR)
 
 
         # instrument things
-    instrument_list = ['IRAC', 'MIPS']
-
+instrument_list = ['IRAC', 'MIPS']
+h_flux_val = []
+l_flux_val = []
         # Select Instrument and Band
-    for sensor in instrument_list:
-        flux = []
-        h_flux = []
-        l_flux = []
-
-        if sensor == 'IRAC':
-            band_list = [3.6]#, 4.5, 5.8, 8.0]
-            for b in band_list:
-                # Run image pull as object
-                my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
-                ret = my_test.run()
-                FluxIR = ret[0]
-                flux_low = ret[1]
-                flux_high = ret[2]
-
-                flux.append(FluxIR)
-                h_flux.append(flux_high)
-                l_flux.append(flux_low)
-            with open('flux_template_irac.txt', 'w') as filehandle:  
-                filehandle.writelines("%s\n" % place for place in band_list)
-            with open(os.path.join(str(MCSNR) + '/fluxes_' + str(MCSNR) + '_' + str(sensor) + '.txt'), 'w') as filehandle:  
-                filehandle.writelines("%s\n" % place for place in flux)
-            with open(os.path.join(str(MCSNR) + '/high_fluxes_' + str(MCSNR) + '_' + str(sensor) + '.txt'), 'w') as filehandle:  
-                filehandle.writelines("%s\n" % place for place in h_flux)
-            with open(os.path.join(str(MCSNR) + '/low_fluxes_' + str(MCSNR) + '_' + str(sensor) + '.txt'), 'w') as filehandle:  
-                filehandle.writelines("%s\n" % place for place in l_flux)
+for sensor in instrument_list:
+    flux = []
+    
+    if sensor == 'IRAC':
+        band_list = [3.6, 4.5, 5.8, 8.0]
+        for b in band_list:
+            # Run image pull as object
+            my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
+            ret = my_test.run()
+            FluxIR = ret[0]
+            x = ret[1] * (1 * u.MJy)
+            flux_high = x[0].value
+            x = ret[2] * (1 * u.MJy)
+            flux_low = x[0].value
             
-        if sensor == 'MIPS':
-            band_list = [24, 70, 160]
-            for b in band_list:
+            flux.append(FluxIR)
+            h_flux_val.append(flux_high)
+            l_flux_val.append(flux_low)
+
+        with open('flux_template_irac.txt', 'w') as filehandle:  
+            filehandle.writelines("%s\n" % place for place in band_list)
+        with open(os.path.join(str(MCSNR) + '/fluxes_' + str(MCSNR) + '_' + str(sensor) + '.txt'), 'w') as filehandle:  
+            filehandle.writelines("%s\n" % place for place in flux)
+        with open(os.path.join(str(MCSNR) + '/high_fluxes_' + str(MCSNR) + '_' + str(sensor) + '.txt'), 'w') as filehandle:  
+            filehandle.writelines("%s\n" % place for place in h_flux_val)
+        with open(os.path.join(str(MCSNR) + '/low_fluxes_' + str(MCSNR) + '_' + str(sensor) + '.txt'), 'w') as filehandle:  
+            filehandle.writelines("%s\n" % place for place in l_flux_val)
+            
+    if sensor == 'MIPS':
+        band_list = [24, 70, 160]
+        for b in band_list:
                 # Run image pull as object
-                my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
-                ret = my_test.run()
-                FluxIR = ret[0]
-                flux_low = ret[1]
-                flux_high = ret[2]
+            my_test = ImagePull(MCSNR, RA, DE, Rad, sensor, b)
+            ret = my_test.run()
+            FluxIR = ret[0]
+            x = ret[1] * (1 * u.MJy)
+            flux_high = x[0].value
+            x = ret[2] * (1 * u.MJy)
+            flux_low = x[0].value
 
-                flux.append(FluxIR)
-                h_flux.append(flux_high)
-                l_flux.append(flux_low)
-            with open('flux_template_mips.txt', 'w') as filehandle:  
-                filehandle.writelines("%s\n" % place for place in band_list)
-            with open(os.path.join(str(MCSNR) + '/fluxes_' + str(MCSNR) + '_' + str(sensor) + '.txt'), 'w') as filehandle:  
-                filehandle.writelines("%s\n" % place for place in flux)
-            with open(os.path.join(str(MCSNR) + '/high_fluxes_' + str(MCSNR) + '_' + str(sensor) + '.txt'), 'w') as filehandle:  
-                filehandle.writelines("%s\n" % place for place in h_flux)
-            with open(os.path.join(str(MCSNR) + '/low_fluxes_' + str(MCSNR) + '_' + str(sensor) + '.txt'), 'w') as filehandle:  
-                filehandle.writelines("%s\n" % place for place in l_flux)
+            flux.append(FluxIR)
+            h_flux_val.append(flux_high)
+            l_flux_val.append(flux_low)
 
-    plt.scatter(band_list, h_flux, 'r')
-    plt.hold()
-    plt.scatter(band_list, l_flux, 'b')
-    plot_name = os.path.join(str(MCSNR) + '/flux_plot_' + str(MCSNR) + '.pdf')
+        with open('flux_template_irac.txt', 'w') as filehandle:  
+            filehandle.writelines("%s\n" % place for place in band_list)
+        with open(os.path.join(str(MCSNR) + '/fluxes_' + str(MCSNR) + '_' + str(sensor) + '.txt'), 'w') as filehandle:  
+            filehandle.writelines("%s\n" % place for place in flux)
+        with open(os.path.join(str(MCSNR) + '/high_fluxes_' + str(MCSNR) + '_' + str(sensor) + '.txt'), 'w') as filehandle:  
+            filehandle.writelines("%s\n" % place for place in h_flux_val)
+        with open(os.path.join(str(MCSNR) + '/low_fluxes_' + str(MCSNR) + '_' + str(sensor) + '.txt'), 'w') as filehandle:  
+            filehandle.writelines("%s\n" % place for place in l_flux_val)
 
-    fig.savefig(plot_name, dpi=200)
+band_list = [3.6, 4.5, 5.8, 8.0, 24, 70, 160]
+plt.plot(band_list, h_flux_val, 'r', label="High Flux")
+plt.plot(band_list, l_flux_val, 'b', label="Low Flux")
+name = str(MCSNR) + '-Flux vs Wavelength'
+plt.title(name)
+plt.xlabel('Wavelength (um)')
+plt.ylabel('Flux (erg/s/cm^2)')
+
+plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+
+plot_name = os.path.join(str(MCSNR) + '/flux_plot_' + str(MCSNR) + '.pdf')
+
+plt.savefig(plot_name, dpi=200)
